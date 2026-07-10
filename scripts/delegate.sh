@@ -78,26 +78,66 @@ lock_path="$agent_dir/.lock"
 
 mkdir -p "$agent_dir"
 
-acquire_lock() {
-  if mkdir "$lock_path" 2>/dev/null; then
-    printf '%s\n' "$$" >"$lock_path/pid"
+pid_is_alive() {
+  [[ $1 =~ ^[0-9]+$ ]] && kill -0 "$1" 2>/dev/null
+}
+
+write_lock_owner() {
+  if printf '%s\n' "$$" >"$lock_path/pid"; then
     return 0
   fi
 
+  rmdir "$lock_path" 2>/dev/null || true
+  return 1
+}
+
+acquire_lock() {
+  if mkdir "$lock_path" 2>/dev/null; then
+    write_lock_owner
+    return
+  fi
+
   local owner_pid=''
-  if [[ -r $lock_path/pid ]]; then
-    owner_pid=$(<"$lock_path/pid")
-  fi
+  local owner_codex_pid=''
+  local stale_path=''
 
-  if [[ -n $owner_pid ]] && kill -0 "$owner_pid" 2>/dev/null; then
+  if [[ ! -r $lock_path/pid ]] || ! IFS= read -r owner_pid <"$lock_path/pid"; then
     return 1
   fi
 
-  rm -rf "$lock_path"
+  if [[ ! $owner_pid =~ ^[0-9]+$ ]]; then
+    return 1
+  fi
+
+  if [[ -e $lock_path/codex_pid ]]; then
+    if [[ ! -r $lock_path/codex_pid ]] || ! IFS= read -r owner_codex_pid <"$lock_path/codex_pid"; then
+      return 1
+    fi
+    if [[ ! $owner_codex_pid =~ ^[0-9]+$ ]]; then
+      return 1
+    fi
+  fi
+
+  if pid_is_alive "$owner_pid" || { [[ -n $owner_codex_pid ]] && pid_is_alive "$owner_codex_pid"; }; then
+    return 1
+  fi
+
+  stale_path="$lock_path.stale.$$.$RANDOM"
+  if [[ -e $stale_path ]] || ! mv "$lock_path" "$stale_path" 2>/dev/null; then
+    return 1
+  fi
+
   if ! mkdir "$lock_path" 2>/dev/null; then
+    rm -rf "$stale_path" || true
     return 1
   fi
-  printf '%s\n' "$$" >"$lock_path/pid"
+
+  if ! write_lock_owner; then
+    rm -rf "$stale_path" || true
+    return 1
+  fi
+
+  rm -rf "$stale_path" || true
 }
 
 if ! acquire_lock; then
@@ -106,12 +146,32 @@ if ! acquire_lock; then
 fi
 
 cleanup_lock() {
-  if [[ -r $lock_path/pid && $(<"$lock_path/pid") == "$$" ]]; then
-    rm -f "$lock_path/pid"
+  local owner_pid=''
+  if [[ -r $lock_path/pid ]] && IFS= read -r owner_pid <"$lock_path/pid" && [[ $owner_pid == "$$" ]]; then
+    rm -f "$lock_path/codex_pid" "$lock_path/pid"
     rmdir "$lock_path" 2>/dev/null || true
   fi
 }
 trap cleanup_lock EXIT
+
+codex_pid=''
+wait_interrupted=0
+
+forward_signal() {
+  local signal=$1
+  local signal_status=$2
+
+  if [[ -n $codex_pid ]] && kill -0 "$codex_pid" 2>/dev/null; then
+    wait_interrupted=1
+    kill -s "$signal" "$codex_pid" 2>/dev/null || true
+    return
+  fi
+
+  exit "$signal_status"
+}
+
+trap 'forward_signal TERM 143' TERM
+trap 'forward_signal INT 130' INT
 
 if [[ -e $result_path && $force -ne 1 ]]; then
   printf 'error: refusing to overwrite existing result.md: %s (pass --force to replace it)\n' "$result_path" >&2
@@ -127,9 +187,27 @@ else
 fi
 
 set +e
-codex exec -m "$model" --output-last-message "$result_path" - \
-  <"$input_path" >"$output_path" 2>&1
-codex_status=$?
+(
+  trap - INT TERM
+  exec codex exec -m "$model" --output-last-message "$result_path" -
+) <"$input_path" >"$output_path" 2>&1 &
+codex_pid=$!
+if ! printf '%s\n' "$codex_pid" >"$lock_path/codex_pid"; then
+  kill -TERM "$codex_pid" 2>/dev/null || true
+  wait "$codex_pid" 2>/dev/null || true
+  printf 'error: could not record Codex child PID in lock: %s\n' "$lock_path" >&2
+  exit 1
+fi
+
+while true; do
+  wait_interrupted=0
+  wait "$codex_pid"
+  codex_status=$?
+  if [[ $wait_interrupted -eq 0 ]]; then
+    break
+  fi
+done
+codex_pid=''
 set -e
 
 if [[ ! -e $result_path ]]; then
