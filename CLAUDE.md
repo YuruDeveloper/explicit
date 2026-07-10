@@ -1,15 +1,29 @@
 # CLAUDE.md
 
-## 1. Required Reading at the Start of a Session
+## 1. Session Start and Context Budget
 
-At the beginning of every new session, read the following documents in order before starting work.
+At the beginning of every new session, read only `continue.md` in full. It is a small checkpoint (see 1.2). Every other project document is a searchable knowledge store: never read it in full.
 
-| Order | Document | Purpose | When to Read |
-|---:|---|---|---|
-| 1 | `continue.md` | Implementation progress, completed commits, next starting point, run instructions, and cautions | **Always read first** |
-| 2 | `design.md` | Approved target architecture, technical decisions, and phased roadmap | **Always** |
-| 3 | `idea.md` | Manufacturing analogy, conceptual framework, and rationale for the final goal | When concepts, terminology, or product direction matter |
-| 4 | `problem.md` | Gaps between the current implementation and the target, prioritized as P0/P1/P2 | When determining priorities or understanding problem context |
+| Document | Purpose | How to Read |
+|---|---|---|
+| `continue.md` | Current goal, state, verification results, open issues, next action | **Read in full, always first** |
+| `design.md` | Approved target architecture, technical decisions, and phased roadmap | Search headers/keywords, read only the relevant sections |
+| `idea.md` | Manufacturing analogy, conceptual framework, and rationale for the final goal | Partial read only, when concepts or direction matter |
+| `problem.md` | Gaps between the current implementation and the target, prioritized as P0/P1/P2 | Partial read only, when prioritizing |
+| `report.md` | Subagent audit report | Partial read only, as historical evidence |
+| `history/tasks/` | Archived task records | Never bulk-read; search filenames/titles first, then read only the needed part |
+
+Session start procedure:
+
+```text
+Read continue.md
+→ Identify the current task's keywords and relevant documents
+→ Search those documents by header or keyword
+→ Read only the needed sections
+→ Confirm actual behavior from code and tests
+```
+
+Full-file reads of `idea.md`, `design.md`, `problem.md`, and `report.md` are prohibited. Procedure: (1) search headers, keywords, or exact terms first; (2) identify the relevant section and line range; (3) read the minimal range; (4) expand only if the meaning is unclear; (5) never re-read an unchanged section already read in this session. `design.md` remains the single source of truth for design — authority does not justify full reads.
 
 Document authority and conflict rules:
 
@@ -29,11 +43,31 @@ Do not store project knowledge in Claude's automatic memory or rely on implicit 
 - Record architecture decisions in `design.md`.
 - Record current gaps from the target in `problem.md`.
 - Record implementation progress and the next starting point in `continue.md`.
-- Record independent audits in `report.md` or `agents/.../result.md`. Consult the corresponding `output.md` when the complete execution evidence is needed.
+- Record independent audits in `report.md` or `agents/.../result.md`. `output.md` is a raw audit log, not project knowledge (see 4.3).
 - Do not create or update `.claude/projects/.../memory`, `MEMORY.md`, or individual memory files.
 - In a new session, read the repository documents directly instead of assuming automatic memory is correct.
 
 Keep `continue.md` current at all times. Update it immediately when commits, merges, design decisions, the next starting point, or run instructions change. Never end a session with documentation that is older than the code.
+
+### 1.2 `continue.md` Size Limit and `history/tasks/`
+
+`continue.md` is a small checkpoint, not a chronicle.
+
+- Keep it under ~2,000 tokens; if token counting is impractical, use 8,000 characters as a conservative cap.
+- Keep only: current goal, current state, verification results, open issues, and next actions.
+- Do not accumulate detailed narratives of completed work.
+- Before exceeding the cap, move completed or inactive records to `history/tasks/YYYY-MM-DD-task-name.md`, one file per task.
+- After moving, leave only the path and a one-line relevance note in `continue.md`.
+
+### 1.3 Context Maintenance at Task-Loop Boundaries
+
+Perform context cleanup at real task boundaries, not per tool call. One task loop is:
+
+```text
+Investigate → implement or decide → verify → update continue.md and archive old records → report
+```
+
+A single file read, a single command run, or a single error fix does not count as its own loop.
 
 ## 2. Current Implementation Status and Problems
 
@@ -147,7 +181,22 @@ agents/2026-07-10-stage0-sample/
 - Make the real model visible in role names and UI labels, such as `terra-implement`, `sol-review`, `luna-verify`, or `gpt-5.6-sol:review-payments`.
 - Do not record secrets, tokens, or unnecessary internal reasoning.
 
-## 5. Worktree and Parallel Implementation Rules
+### 4.3 `output.md` Isolation Rules
+
+Full-file reads of any `output.md` are prohibited.
+
+- The parent agent always reads `result.md` first.
+- Treat `output.md` as a raw audit log, not project knowledge.
+- Only when diagnosing a failure or verifying a claim, search it for the specific command, error, filename, or marker, and read only a narrow line range around the hits.
+- Never read, combine, or fully summarize multiple `output.md` files at once.
+- Exclude `agents/**/output.md` and `history/**` from broad repository searches by default:
+
+```powershell
+rg "term" . -g "!agents/**/output.md" -g "!history/**"
+```
+
+- Never feed a past `output.md` into another agent as input.
+- Longer term, consider storing raw logs as `artifacts/output.log` or in an external CI artifact store instead of Markdown. and Parallel Implementation Rules
 
 Parallel implementation agents work in explicit worktrees directly under the repository root.
 
@@ -224,9 +273,9 @@ The final handoff must cover the changes, verification results, design decisions
 
 ## 9. Pre-Work Checklist
 
-1. Did you read `continue.md`?
-2. Did you confirm the approved boundaries in `design.md`?
-3. When relevant, did you read `idea.md`, `problem.md`, and `report.md`?
+1. Did you read `continue.md` (and only `continue.md`) in full?
+2. Did you confirm the approved boundaries in `design.md` via targeted section reads, not a full read?
+3. When relevant, did you search and partially read `idea.md`, `problem.md`, `report.md`, and `history/tasks/`?
 4. Did you inspect Git status and existing user changes?
 5. Did you define the acceptance criteria and risk level?
 6. Did you route implementation, verification, and review according to the Cost, Intelligence, and Taste table?
@@ -236,3 +285,4 @@ The final handoff must cover the changes, verification results, design decisions
 10. If the task warrants independent review, are the implementation agent and gpt-5.6-sol reviewer separate?
 11. Did you inspect the verification evidence?
 12. Are the code and `continue.md` consistent?
+13. Is `continue.md` under its size cap, with old records moved to `history/tasks/`?
