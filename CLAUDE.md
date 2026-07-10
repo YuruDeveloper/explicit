@@ -196,7 +196,18 @@ rg "term" . -g "!agents/**/output.md" -g "!history/**"
 ```
 
 - Never feed a past `output.md` into another agent as input.
-- Longer term, consider storing raw logs as `artifacts/output.log` or in an external CI artifact store instead of Markdown. and Parallel Implementation Rules
+- Longer term, consider storing raw logs as `artifacts/output.log` or in an external CI artifact store instead of Markdown.
+
+### 4.4 Foreground First, Exponential Fallback (2026-07-11)
+
+Subagents cannot idle-wait: foreground `sleep` is blocked, and ending the turn to "wait for codex" makes the harness treat the wrapper as completed (three early-exit incidents on 2026-07-11).
+
+1. The wrapper runs `codex exec` as a single **foreground** Bash call with explicit `timeout: 600000` (10-minute ceiling; most codex tasks finish in 5–7 minutes).
+2. On timeout, re-launch (or confirm still-running) codex in background and poll for `result.md` with **exponentially increasing waits** (1, 2, 4, 8… minutes) using harness-tracked background Bash.
+3. If the orchestrator sees a wrapper exit early while codex still runs, it attaches its own harness-tracked watcher on `result.md` instead of respawning the wrapper.
+4. Tasks expected to exceed 10 minutes should be split into smaller codex runs when practical.
+
+## 5. Worktree and Parallel Implementation Rules
 
 Parallel implementation agents work in explicit worktrees directly under the repository root.
 
