@@ -1,0 +1,238 @@
+# CLAUDE.md
+
+## 1. Required Reading at the Start of a Session
+
+At the beginning of every new session, read the following documents in order before starting work.
+
+| Order | Document | Purpose | When to Read |
+|---:|---|---|---|
+| 1 | `continue.md` | Implementation progress, completed commits, next starting point, run instructions, and cautions | **Always read first** |
+| 2 | `design.md` | Approved target architecture, technical decisions, and phased roadmap | **Always** |
+| 3 | `idea.md` | Manufacturing analogy, conceptual framework, and rationale for the final goal | When concepts, terminology, or product direction matter |
+| 4 | `problem.md` | Gaps between the current implementation and the target, prioritized as P0/P1/P2 | When determining priorities or understanding problem context |
+
+Document authority and conflict rules:
+
+- `design.md` is the single source of truth for goals and approved design decisions.
+- `continue.md` is the source of truth for implementation status and the next task.
+- `idea.md` explains what the project is building and why.
+- `problem.md` records only the gaps between the current implementation and the approved design.
+- Confirm actual behavior from the relevant code, diffs, and verification results.
+
+When documents conflict, use `design.md` for goals and architecture, `continue.md` for implementation status, and code plus tests for actual behavior. Update stale documents when a conflict is found.
+
+### 1.1 Explicit Project Knowledge Management
+
+Do not store project knowledge in Claude's automatic memory or rely on implicit session memory.
+
+- Record persistent working rules, user preferences, model routing, and coding standards in `CLAUDE.md`.
+- Record architecture decisions in `design.md`.
+- Record current gaps from the target in `problem.md`.
+- Record implementation progress and the next starting point in `continue.md`.
+- Record independent audits in `report.md` or `agents/.../result.md`. Consult the corresponding `output.md` when the complete execution evidence is needed.
+- Do not create or update `.claude/projects/.../memory`, `MEMORY.md`, or individual memory files.
+- In a new session, read the repository documents directly instead of assuming automatic memory is correct.
+
+Keep `continue.md` current at all times. Update it immediately when commits, merges, design decisions, the next starting point, or run instructions change. Never end a session with documentation that is older than the code.
+
+## 2. Current Implementation Status and Problems
+
+Use `continue.md` as the detailed and current source of truth.
+
+### 2.1 How to Use `problem.md` and `report.md`
+
+`problem.md` classifies current gaps as P0, P1, or P2. `report.md` is a report produced by a subagent.
+
+Do not treat `report.md` as a current defect list without verification. Use it as a regression checklist and as evidence for historical claims. Reconfirm the current state from the code, tests, and `continue.md`.
+
+## 3. Model Routing Architecture
+
+All scores use a 1–10 scale. Higher Intelligence and Taste scores are better. A higher Cost score means the model is less expensive to use.
+
+| Model | Cost | Intelligence | Taste | Primary Use Case |
+|---|:---:|:---:|:---:|---|
+| **fable-5** | 2 | 9 | 9 | High-level planning, complex reasoning, and architecture design |
+| **opus-48** | 3 | 7 | 8 | Refinement and high-quality code modifications |
+| **sonnet-5** | 5 | 5 | 7 | Lightweight orchestration and thin-wrapper execution |
+| **gpt-5.6-terra** | 7 | 8 | 5 | Mechanical bulk work, data analysis, migrations, and computer use |
+| **gpt-5.6-sol** | 4 | 9 | 9 | Adversarial review, agent evaluation, and advanced refactoring |
+| **gpt-5.6-luna** | 10 | 3 | 3 | Simple, narrow, deterministic, low-risk tasks |
+
+For production code, use the strict priority **Intelligence > Taste > Cost**. Cost is only a tie-breaker.
+
+- fable-5 focuses on specifications, design decisions, and reviewing results. It does not perform routine implementation, builds, or tests directly.
+- Route design-sensitive, concurrency-sensitive, and structurally risky implementation to gpt-5.6-sol.
+- Route well-specified mechanical implementation and migrations to gpt-5.6-terra.
+- Route routine verification to gpt-5.6-luna.
+- UI, user-facing copy, and API/SDK design require a model with Taste 7 or higher.
+- Route runtime, browser, and computer-use verification to gpt-5.6-terra.
+- Route independent plan challenges, patch reviews, and agent evaluations to gpt-5.6-sol.
+- If a lower-cost model does not meet the quality bar, rerun the task with a more capable model without requesting separate permission.
+- Never use Haiku. Use sonnet-5 for lightweight wrappers.
+- Use gpt-5.6-luna only for simple, deterministic, low-risk tasks that are easy to verify.
+
+### 3.1 Role of gpt-5.6-sol
+
+gpt-5.6-sol is the senior review and refactoring authority.
+
+- **Adversarial Review:** Challenge plans and patches, looking for security issues, concurrency defects, edge cases, and dropped requirements.
+- **Agent Evaluation:** Compare another agent's report against the original request and repository evidence.
+- **Advanced Refactoring:** Improve package boundaries, ownership, APIs, testability, and performance.
+
+Do not accept the author's summary as fact. Start from the original request and inspect the code, diffs, tests, and configuration directly. Keep the reviewer separate from the author whenever possible.
+
+## 4. Claude Thin Wrapper and Explicit Agent Invocation
+
+Claude's native Workflow/Agent interface cannot directly select GPT models. Therefore, every task assigned to `gpt-5.6-luna`, `gpt-5.6-terra`, or `gpt-5.6-sol` must use a **sonnet-5 thin wrapper with `codex exec`**.
+
+### 4.1 Thin-Wrapper Requirements
+
+The wrapper performs only the following duties:
+
+1. Convert the request into a self-contained Codex prompt.
+2. Write the exact prompt to `input.md` in the designated `agents/` directory.
+3. Invoke the selected GPT model with `codex exec -m <model>`.
+4. Save every Codex action and execution output verbatim to `output.md` in the same directory.
+5. Save Codex's final result to `result.md` so the parent agent can read it directly.
+6. Send the orchestrator only a brief completion notice and the location of `result.md`.
+
+The wrapper must not perform the actual design, implementation, or review. The GPT model named in the task label must do the substantive work.
+
+Example:
+
+```bash
+codex exec --dangerously-bypass-approvals-and-sandbox \
+  -m gpt-5.6-terra \
+  --output-last-message agents/2026-07-10-task/terra-implement/result.md \
+  - < agents/2026-07-10-task/terra-implement/input.md \
+  > agents/2026-07-10-task/terra-implement/output.md
+```
+
+If the environment does not support `--output-last-message`, the wrapper must separately extract Codex's final response into `result.md` without adding judgment, summarizing it, or rewriting it.
+
+### 4.2 Required `agents/` Records
+
+Record every delegated task under the repository root using this structure:
+
+```text
+agents/<YYYY-MM-DD>-<task-slug>/<agent-role>/
+  input.md
+  output.md
+  result.md
+```
+
+Example:
+
+```text
+agents/2026-07-10-stage0-sample/
+  terra-implement/input.md
+  terra-implement/output.md
+  terra-implement/result.md
+  luna-verify/input.md
+  luna-verify/output.md
+  luna-verify/result.md
+  sol-review/input.md
+  sol-review/output.md
+  sol-review/result.md
+```
+
+- `input.md` contains the exact instructions sent to Codex.
+- `output.md` is the verbatim log of all Codex actions, tool use, and execution output.
+- `result.md` is Codex's final result. It must give the parent agent the changes, verification results, decision, and remaining risks.
+- During a normal handoff, the parent agent reads `result.md` first. It reads `output.md` when validating claims, auditing work, or diagnosing a failure.
+- Commit all three files to Git because they have audit value.
+- The orchestrator must not write or transcribe the prompt, execution log, or result report on the wrapper's behalf.
+- The wrapper writes the complete input/output/result trail itself.
+- Use the scratchpad only for temporary information with no audit value.
+- Make the real model visible in role names and UI labels, such as `terra-implement`, `sol-review`, `luna-verify`, or `gpt-5.6-sol:review-payments`.
+- Do not record secrets, tokens, or unnecessary internal reasoning.
+
+## 5. Worktree and Parallel Implementation Rules
+
+Parallel implementation agents work in explicit worktrees directly under the repository root.
+
+```text
+worktrees/<name>/
+```
+
+Mandatory rules:
+
+1. Do not rely on hidden `.claude/worktrees/` directories.
+2. The orchestrator creates a dedicated branch and path explicitly with `git worktree add`.
+3. Give the wrapper and Codex the exact absolute path of the assigned worktree.
+4. State each agent's file or package ownership in its prompt.
+5. Do not parallelize implementation tasks that modify the same files.
+6. An agent must not modify or revert user changes outside its assigned worktree.
+7. Before integration, inspect the branch diff, commits, and verification results.
+8. Resolve conflicts by reviewing their meaning. Do not mechanically overwrite one side.
+9. After merging, confirm that no unmerged changes remain, then remove the worktree and delete its temporary branch.
+10. For long-running work, use an appropriate timeout or background execution and poll for the creation of `result.md`. Read `output.md` only when checking progress or diagnosing failure.
+
+Do not create a worktree for a short, read-only task performed by one agent. A worktree is mandatory for parallel implementation, independent code modifications, or work with a meaningful conflict risk.
+
+## 6. Optional Independent Review and Agent Evaluation
+
+Independent review is optional and should be used when the task's risk, complexity, or uncertainty justifies the additional cost. It is recommended for security-sensitive, concurrency-sensitive, migration-heavy, cross-cutting, public-contract, or difficult-to-reverse changes. Routine, narrow, deterministic work does not require a separate reviewer when its result is easy to verify directly.
+
+### 6.1 Adversarial Review Procedure
+
+1. Restate the acceptance criteria and implicit invariants from the user's request.
+2. Inspect the relevant implementation, tests, configuration, and diff directly.
+3. Try to falsify the solution using realistic failure scenarios and boundary conditions.
+4. Rank findings by severity and cite exact files and lines where possible.
+5. Separate confirmed defects, plausible risks, questions, and style preferences.
+6. If there is no material defect, approve explicitly and state the evidence checked.
+
+The verdict must be one of `approve`, `approve with non-blocking notes`, or `request changes`. Every blocking finding must include a concrete remediation path.
+
+### 6.2 Evaluation Criteria
+
+| Dimension | Standard |
+|---|---|
+| Correctness | Satisfies the request and preserves the required behavior and contracts |
+| Completeness | Includes every deliverable, edge case, migration, and integration point |
+| Evidence | Supports claims with code, diffs, static checks, tests, or runtime results |
+| Design Quality | Maintains clear responsibilities and boundaries with appropriate complexity |
+| Safety | Addresses security, data integrity, compatibility, concurrency, and rollback risks |
+| Communication | Accurately reports changes, verification, limitations, and residual risks |
+
+Explain every material deduction. Do not approve an output merely because the report is well written.
+
+## 7. Verification and Execution Rules
+
+- The fable-5 orchestrator performs only the reading and static investigation needed for design decisions.
+- Route routine `go test`, `go vet`, `tsc`, migration checks, and builds through a gpt-5.6-luna wrapper.
+- Route browser, live-runtime, and computer-use verification through a gpt-5.6-terra wrapper.
+- Never claim that a check passed if it was not run.
+- Distinguish existing failures from failures introduced by the current change.
+- Do not weaken requirements or tests merely to make verification pass.
+
+## 8. Git, Changes, and Handoff
+
+- Inspect `git status` and the relevant diff before starting work.
+- Treat existing changes as user-owned and do not revert them.
+- Do not run destructive Git commands without explicit approval.
+- Make normal file changes that are necessary and within the requested implementation scope.
+- Confirm before making unrelated changes or expanding operational impact.
+- Group related changes into intentional commits.
+- Commit the corresponding `agents/.../input.md`, `output.md`, and `result.md` records with the related work.
+- Update `continue.md` immediately after a commit, merge, design decision, or change to the next starting point.
+- Use Korean for the product UI and project documentation by default. Prefer kaomoji over emoji when a visual expression is needed.
+- Use `temp/` for drafts and scratch work shared with the user.
+
+The final handoff must cover the changes, verification results, design decisions and assumptions, unverified risks, migration or deployment follow-up, and the next starting point.
+
+## 9. Pre-Work Checklist
+
+1. Did you read `continue.md`?
+2. Did you confirm the approved boundaries in `design.md`?
+3. When relevant, did you read `idea.md`, `problem.md`, and `report.md`?
+4. Did you inspect Git status and existing user changes?
+5. Did you define the acceptance criteria and risk level?
+6. Did you route implementation, verification, and review according to the Cost, Intelligence, and Taste table?
+7. Are GPT calls going through a sonnet-5 thin wrapper?
+8. Is the wrapper writing `agents/.../input.md`, `output.md`, and `result.md` itself?
+9. For parallel implementation, did you create a dedicated worktree directly under the repository root?
+10. If the task warrants independent review, are the implementation agent and gpt-5.6-sol reviewer separate?
+11. Did you inspect the verification evidence?
+12. Are the code and `continue.md` consistent?
