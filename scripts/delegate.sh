@@ -74,13 +74,26 @@ agent_dir="$repo_root/agents/$(date +%F)-$task_slug/$role"
 input_path="$agent_dir/input.md"
 output_path="$agent_dir/output.md"
 result_path="$agent_dir/result.md"
+lock_path="$agent_dir/.lock"
 
 mkdir -p "$agent_dir"
+
+if ! mkdir "$lock_path" 2>/dev/null; then
+  printf 'error: refusing to start; another invocation is already writing audit files: %s\n' "$agent_dir" >&2
+  exit 1
+fi
+
+cleanup_lock() {
+  rmdir "$lock_path" 2>/dev/null || true
+}
+trap cleanup_lock EXIT
 
 if [[ -e $result_path && $force -ne 1 ]]; then
   printf 'error: refusing to overwrite existing result.md: %s (pass --force to replace it)\n' "$result_path" >&2
   exit 1
 fi
+
+: >"$result_path"
 
 if [[ -n $input_file ]]; then
   cp "$input_file" "$input_path"
