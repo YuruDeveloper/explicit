@@ -136,6 +136,38 @@ wait "$first_pid"
 concurrent_dir="$test_repo/agents/$today-delegate-concurrent/luna-concurrent"
 [[ -f "$concurrent_dir/result.md" ]]
 
+stale_role='luna-stale-lock'
+stale_dir="$test_repo/agents/$today-delegate-stale-lock/$stale_role"
+stale_lock_path="$stale_dir/.lock"
+mkdir -p "$stale_dir"
+mkdir "$stale_lock_path"
+(exit 0) &
+dead_owner_pid=$!
+wait "$dead_owner_pid"
+printf '%s\n' "$dead_owner_pid" >"$stale_lock_path/pid"
+printf 'stale lock prompt' | run_helper delegate-stale-lock "$stale_role" gpt-5.6-luna >/dev/null
+[[ $(<"$stale_dir/result.md") == 'stale lock prompt' ]]
+[[ ! -e $stale_lock_path ]]
+
+live_role='luna-live-lock'
+live_dir="$test_repo/agents/$today-delegate-live-lock/$live_role"
+live_lock_path="$live_dir/.lock"
+mkdir -p "$live_dir"
+sleep 30 &
+live_owner_pid=$!
+mkdir "$live_lock_path"
+printf '%s\n' "$live_owner_pid" >"$live_lock_path/pid"
+if run_helper delegate-live-lock "$live_role" gpt-5.6-luna >"$tmpdir/live-owner.out" 2>&1; then
+  printf 'expected live-owner lock to be refused\n' >&2
+  exit 1
+else
+  status=$?
+fi
+[[ $status -eq 1 ]]
+rg -F 'another invocation is already writing audit files' "$tmpdir/live-owner.out" >/dev/null
+kill "$live_owner_pid"
+wait "$live_owner_pid" 2>/dev/null || true
+
 if run_helper invalid >/dev/null 2>&1; then
   printf 'expected invalid arguments to fail\n' >&2
   exit 1

@@ -78,13 +78,38 @@ lock_path="$agent_dir/.lock"
 
 mkdir -p "$agent_dir"
 
-if ! mkdir "$lock_path" 2>/dev/null; then
+acquire_lock() {
+  if mkdir "$lock_path" 2>/dev/null; then
+    printf '%s\n' "$$" >"$lock_path/pid"
+    return 0
+  fi
+
+  local owner_pid=''
+  if [[ -r $lock_path/pid ]]; then
+    owner_pid=$(<"$lock_path/pid")
+  fi
+
+  if [[ -n $owner_pid ]] && kill -0 "$owner_pid" 2>/dev/null; then
+    return 1
+  fi
+
+  rm -rf "$lock_path"
+  if ! mkdir "$lock_path" 2>/dev/null; then
+    return 1
+  fi
+  printf '%s\n' "$$" >"$lock_path/pid"
+}
+
+if ! acquire_lock; then
   printf 'error: refusing to start; another invocation is already writing audit files: %s\n' "$agent_dir" >&2
   exit 1
 fi
 
 cleanup_lock() {
-  rmdir "$lock_path" 2>/dev/null || true
+  if [[ -r $lock_path/pid && $(<"$lock_path/pid") == "$$" ]]; then
+    rm -f "$lock_path/pid"
+    rmdir "$lock_path" 2>/dev/null || true
+  fi
 }
 trap cleanup_lock EXIT
 
