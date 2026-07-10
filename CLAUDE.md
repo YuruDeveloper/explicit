@@ -8,7 +8,7 @@ At the beginning of every new session, read only `continue.md` in full. It is a 
 |---|---|---|
 | `continue.md` | Current goal, state, verification results, open issues, next action | **Read in full, always first** |
 | `design.md` | Approved target architecture, technical decisions, and phased roadmap | Search headers/keywords, read only the relevant sections |
-| `idea.md` | Manufacturing analogy, conceptual framework, and rationale for the final goal | Partial read only, when concepts or direction matter |
+| `idea.md` |  conceptual framework, and rationale for the final goal | Partial read only, when concepts or direction matter |
 | `problem.md` | Gaps between the current implementation and the target, prioritized as P0/P1/P2 | Partial read only, when prioritizing |
 | `report.md` | Subagent audit report | Partial read only, as historical evidence |
 | `history/tasks/` | Archived task records | Never bulk-read; search filenames/titles first, then read only the needed part |
