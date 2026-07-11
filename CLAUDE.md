@@ -91,6 +91,7 @@ All scores use a 1–10 scale. Higher Intelligence and Taste scores are better. 
 | **gpt-5.6-terra** | 7 | 8 | 5 | Mechanical bulk work, data analysis, migrations, and computer use |
 | **gpt-5.6-sol** | 4 | 9 | 9 | Adversarial review, agent evaluation, and advanced refactoring |
 | **gpt-5.6-luna** | 10 | 3 | 3 | Simple, narrow, deterministic, low-risk tasks |
+| **grok-4.5** | 8 | 7 | 7 | Self-contained single-shot UI/frontend implementation, low-cost auxiliary parallel work |
 
 For production code, use the strict priority **Intelligence > Taste > Cost**. Cost is only a tie-breaker.
 
@@ -104,6 +105,7 @@ For production code, use the strict priority **Intelligence > Taste > Cost**. Co
 - If a lower-cost model does not meet the quality bar, rerun the task with a more capable model without requesting separate permission.
 - Never use Haiku. Use sonnet-5 for lightweight wrappers.
 - Use gpt-5.6-luna only for simple, deterministic, low-risk tasks that are easy to verify.
+- grok-4.5 runs on a SuperGrok subscription (300–500 text interactions per rolling 24h, fair-use policy on sustained heavy use), so marginal cost is zero within the cap. Prefer it for self-contained, single-turn tasks; do not put it in long multi-turn sessions or always-on pipelines. It reports completion without self-verification, so route verification separately per the existing rules.
 
 ### 3.1 Role of gpt-5.6-sol
 
@@ -198,7 +200,7 @@ rg "term" . -g "!agents/**/output.md" -g "!history/**"
 - Never feed a past `output.md` into another agent as input.
 - Longer term, consider storing raw logs as `artifacts/output.log` or in an external CI artifact store instead of Markdown.
 
-### 4.4 Foreground First, Exponential Fallback (2026-07-11)
+### 4.4 Foreground First, Exponential Fallback 
 
 Subagents cannot idle-wait: foreground `sleep` is blocked, and ending the turn to "wait for codex" makes the harness treat the wrapper as completed (three early-exit incidents on 2026-07-11).
 
@@ -206,6 +208,20 @@ Subagents cannot idle-wait: foreground `sleep` is blocked, and ending the turn t
 2. On timeout, re-launch (or confirm still-running) codex in background and poll for `result.md` with **exponentially increasing waits** (1, 2, 4, 8… minutes) using harness-tracked background Bash.
 3. If the orchestrator sees a wrapper exit early while codex still runs, it attaches its own harness-tracked watcher on `result.md` instead of respawning the wrapper.
 4. Tasks expected to exceed 10 minutes should be split into smaller codex runs when practical.
+
+### 4.5 grok-4.5 Invocation
+
+grok-4.5 is invoked via the `grok` CLI, not `codex exec`. Verified behavior (v0.2.93):
+
+- Headless run with tools: `grok --always-approve --cwd <absolute-path> -p "<prompt>"`
+- stdout is the concatenation of ALL assistant text (intermediate remarks + final message), not the final message alone. There is no `--output-last-message` equivalent.
+- No output format exposes tool calls: `plain` and `json` merge intermediate and final text; `streaming-json` emits only thought/text/end events. A verbatim action log (`output.md` equivalent) cannot be obtained.
+- Wrapper rules:
+  1. Instruct in the prompt: "Output only the final report; no intermediate remarks" (still expect an occasional stray line).
+  2. Save stdout as both the quasi-log and the basis for `result.md`; extract the final section into `result.md` without rewriting it.
+  3. Because a tool-call audit trail is unavailable, do NOT use grok for work requiring audit evidence (design changes, migrations); use codex models.
+- `--output-format json` returns `sessionId`; follow-up turns can attach via `grok --resume <sessionId>`.
+- Unique options: `--json-schema` (structured output), `--best-of-n` (parallel N runs, heavy quota consumption — use sparingly), `--worktree`.
 
 ## 5. Worktree and Parallel Implementation Rules
 
