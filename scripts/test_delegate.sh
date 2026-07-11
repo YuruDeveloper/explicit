@@ -236,6 +236,26 @@ printf 'stale lock prompt' | run_helper delegate-stale-lock "$stale_role" gpt-5.
 [[ $(<"$stale_dir/result.md") == 'stale lock prompt' ]]
 [[ ! -e $stale_lock_path ]]
 
+pending_role='luna-pending-codex-lock'
+pending_dir="$test_repo/agents/$today-delegate-pending-codex-lock/$pending_role"
+pending_lock_path="$pending_dir/.lock"
+mkdir -p "$pending_lock_path"
+(exit 0) &
+pending_dead_pid=$!
+wait "$pending_dead_pid"
+printf '%s\n' "$pending_dead_pid" >"$pending_lock_path/pid"
+printf 'pending\n' >"$pending_lock_path/codex_pid"
+if printf 'must be refused' | run_helper delegate-pending-codex-lock "$pending_role" gpt-5.6-luna >"$tmpdir/pending-codex.out" 2>&1; then
+  printf 'expected a dead-wrapper lock with pending codex marker to be refused\n' >&2
+  exit 1
+else
+  status=$?
+fi
+[[ $status -eq 1 ]]
+[[ -d $pending_lock_path ]]
+[[ ! -e $pending_dir/result.md ]]
+rg -F 'another invocation is already writing audit files' "$tmpdir/pending-codex.out" >/dev/null
+
 missing_pid_role='luna-missing-pid-lock'
 missing_pid_dir="$test_repo/agents/$today-delegate-missing-pid-lock/$missing_pid_role"
 missing_pid_lock_path="$missing_pid_dir/.lock"

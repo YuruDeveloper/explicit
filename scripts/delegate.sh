@@ -186,6 +186,13 @@ else
   cat >"$input_path"
 fi
 
+# Conservative marker: written before the child starts so a wrapper killed in the
+# start→pid-write gap leaves a non-numeric codex_pid, which takeover refuses.
+if ! printf 'pending\n' >"$lock_path/codex_pid"; then
+  printf 'error: could not record pending Codex marker in lock: %s\n' "$lock_path" >&2
+  exit 1
+fi
+
 set +e
 (
   trap - INT TERM
