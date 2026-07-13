@@ -152,6 +152,8 @@ agents/2026-07-10-01-example/01-terra-implement/
 
 The parent agent normally reads only `result.md`. It consults `output.md` when validating an important claim or investigating a failure.
 
+Committing the three files (and the `scratchpad/` directory) to Git is optional and follows the user's preference; confirm with the user before including them in a commit.
+
 This separation achieves two goals:
 
 - The parent agent does not waste context on a long execution log.
@@ -229,6 +231,9 @@ Update `continue.md` immediately when:
 │        └─ result.md
 │
 ├─ temp/                             Drafts and scratch work shared with the user
+│
+├─ scratchpad/                       Temporary information with no audit value
+│                                    (used instead of the session-specific system scratchpad)
 │
 └─ worktrees/                        Isolated parallel implementation
    └─ <task>/

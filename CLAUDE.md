@@ -202,10 +202,11 @@ agents/2026-07-10-01-stage0-sample/
 - `output.md` is the verbatim log of all Codex actions, tool use, and execution output.
 - `result.md` is Codex's final result. It must give the parent agent the changes, verification results, decision, and remaining risks.
 - During a normal handoff, the parent agent reads `result.md` first. It reads `output.md` when validating claims, auditing work, or diagnosing a failure.
-- Commit all three files to Git because they have audit value.
+- Committing the three files to Git is optional and follows the user's preference. Ask the user (or follow their previously stated preference) before committing `agents/` records.
 - The orchestrator must not write or transcribe the prompt, execution log, or result report on the wrapper's behalf.
 - The wrapper writes the complete input/output/result trail itself.
 - Use the scratchpad only for temporary information with no audit value.
+- The scratchpad is `scratchpad/` directly under the repository root. Never use the session-specific system scratchpad directory; create and use `scratchpad/` at the repository root instead.
 - Make the real model visible in role names and UI labels, such as `terra-implement`, `sol-review`, `luna-verify`, or `gpt-5.6-sol:review-payments`.
 - Do not record secrets, tokens, or unnecessary internal reasoning.
 
@@ -317,7 +318,7 @@ Explain every material deduction. Do not approve an output merely because the re
 - Make normal file changes that are necessary and within the requested implementation scope.
 - Confirm before making unrelated changes or expanding operational impact.
 - Group related changes into intentional commits.
-- Commit the corresponding `agents/.../input.md`, `output.md`, and `result.md` records with the related work.
+- Committing `agents/.../input.md`, `output.md`, `result.md` records and the `scratchpad/` directory is optional, decided by the user's preference. Confirm with the user before including them in a commit.
 - Update `continue.md` immediately after a commit, merge, design decision, or change to the next starting point.
 - Use Korean for the product UI and project documentation by default. Prefer kaomoji over emoji when a visual expression is needed.
 - Use `temp/` for drafts and scratch work shared with the user.
