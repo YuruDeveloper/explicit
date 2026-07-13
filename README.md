@@ -25,12 +25,17 @@ Lead orchestrator (fable-5)
     │
     ├─ 2. Classify the task and select a model
     │      Design and decisions       → fable-5
+    │      High-quality refinement    → opus-48
     │      High-risk work and review  → gpt-5.6-sol
     │      Bulk and mechanical work   → gpt-5.6-terra
     │      Routine verification       → gpt-5.6-luna
+    │      Single-shot UI / low-cost
+    │      auxiliary parallel work    → grok-4.5
     │
     ├─ 3. Invoke a sonnet-5 thin wrapper
-    │      └─ codex exec -m <actual GPT model>
+    │      └─ scripts/delegate.sh (bash) or scripts/delegate.ps1 (PowerShell)
+    │         └─ codex exec -m <actual GPT model>
+    │         (grok-4.5 uses the grok CLI instead; see CLAUDE.md 4.5)
     │
     ├─ 4. Record the delegation explicitly
     │      agents/<date>-<NN>-<task>/<NN>-<role>/
@@ -73,6 +78,12 @@ idea.md
 
 problem.md
    └─ How the current implementation differs from the target
+
+report.md
+   └─ Subagent audit report, used as historical evidence
+
+history/tasks/
+   └─ Archived task records moved out of continue.md
 ```
 
 ## 1. Match Models to Capability and Cost
@@ -84,9 +95,11 @@ Using the most expensive model for every task wastes resources. Assigning diffic
 | Task | Assigned Model | Reason |
 |---|---|---|
 | Architecture and complex decisions | fable-5 | Strong reasoning and design quality |
+| Refinement and high-quality code modifications | opus-48 | High taste at moderate cost |
 | Adversarial review and advanced refactoring | gpt-5.6-sol | Independent verification and high code quality |
 | Bulk implementation, analysis, and migrations | gpt-5.6-terra | Strong execution ability and cost efficiency |
 | Routine builds, tests, and static checks | gpt-5.6-luna | Lowest cost for narrow, deterministic work |
+| Self-contained single-shot UI and auxiliary parallel work | grok-4.5 | Zero marginal cost within its subscription cap; no audit trail, so not for audited work |
 | Lightweight relay for invoking GPT models | sonnet-5 | Handles invocation and records without doing the substantive work |
 
 The governing priority is:
@@ -113,6 +126,10 @@ input.md + output.md + result.md
 ```
 
 The wrapper does not perform the substantive task. It records the instructions, invokes the selected GPT model, and preserves the resulting files.
+
+The standard invocation path is `scripts/delegate.sh` (bash) or `scripts/delegate.ps1` (Windows PowerShell). Both record `input.md`, invoke `codex exec -m <model> --output-last-message`, preserve `output.md`/`result.md` and the Codex exit code, and guard the audit directory with an atomic per-target lock (stale-owner recovery, orphaned-Codex detection, no double writers). Contract tests live in `scripts/test_delegate.sh` and `scripts/test_delegate.ps1`.
+
+grok-4.5 is the exception: it is invoked through the `grok` CLI, cannot produce a verbatim action log, and is therefore not used for work requiring audit evidence (see CLAUDE.md 4.5).
 
 This makes the actual working model visible in both the user interface and the audit trail.
 
@@ -147,11 +164,10 @@ If several implementation agents share one working directory, they can overwrite
 Parallel implementation therefore runs in independent worktrees directly under the repository root.
 
 ```text
-factory/
-  worktrees/
-    error-contract/     ─ Dedicated branch A
-    staged-qc/          ─ Dedicated branch B
-    assembly-engine/    ─ Dedicated branch C
+worktrees/
+  error-contract/     ─ Dedicated branch A
+  staged-qc/          ─ Dedicated branch B
+  assembly-engine/    ─ Dedicated branch C
 ```
 
 Each agent modifies only its assigned files and packages. Before integration, inspect its diff, commits, and verification results. After merging, remove the worktree and its temporary branch.
@@ -190,23 +206,35 @@ Update `continue.md` immediately when:
 ## Repository Structure
 
 ```text
-factory/
+.
 ├─ CLAUDE.md                         AI operating rules
 ├─ continue.md                       Progress and next starting point
 ├─ design.md                         Approved goals and architecture
 ├─ idea.md                           Concepts and rationale
 ├─ problem.md                        Gaps between implementation and target
+├─ report.md                         Subagent audit report
+│
+├─ history/
+│  └─ tasks/                         Archived task records
+│
+├─ scripts/
+│  ├─ delegate.sh / delegate.ps1     Standard delegation helpers
+│  └─ test_delegate.sh / .ps1        Contract tests for the helpers
 │
 ├─ agents/                           Delegation audit trail
-│  └─ <date>-<task>/
-│     └─ <actual-model>-<role>/
+│  └─ <date>-<NN>-<task>/
+│     └─ <NN>-<actual-model>-<role>/
 │        ├─ input.md
 │        ├─ output.md
 │        └─ result.md
 │
+├─ temp/                             Drafts and scratch work shared with the user
+│
 └─ worktrees/                        Isolated parallel implementation
    └─ <task>/
 ```
+
+`<NN>` is a two-digit sequence number allocated automatically by the delegation helpers: per-date for task directories and per-task for role directories. An existing directory with the same slug/role is reused.
 
 ---
 
@@ -223,7 +251,7 @@ factory/
    ↓
 5. Create agents/.../input.md
    ↓
-6. Invoke codex exec through the thin wrapper
+6. Invoke codex exec through the thin wrapper (scripts/delegate.sh or delegate.ps1)
    ├─ output.md: complete execution log
    └─ result.md: final result
    ↓

@@ -134,13 +134,22 @@ The wrapper performs only the following duties:
 
 The wrapper must not perform the actual design, implementation, or review. The GPT model named in the task label must do the substantive work.
 
-Use `scripts/delegate.sh` as the standard invocation path. It performs the mechanical wrapper duties deterministically — records `input.md`, invokes `codex exec -m <model> --output-last-message`, preserves `output.md`/`result.md` and the Codex exit code — and additionally guards the audit directory with an atomic per-target lock (stale-owner recovery, orphaned-Codex detection, no double writers):
+Use `scripts/delegate.sh` (bash) or `scripts/delegate.ps1` (Windows PowerShell) as the standard invocation path. Both perform the mechanical wrapper duties deterministically — record `input.md`, invoke `codex exec -m <model> --output-last-message`, preserve `output.md`/`result.md` and the Codex exit code — and additionally guard the audit directory with an atomic per-target lock (stale-owner recovery, orphaned-Codex detection, no double writers):
 
 ```bash
 scripts/delegate.sh <task-slug> <role> <model> [input-file]
 # example
 printf '%s\n' "$PROMPT" | scripts/delegate.sh 2026-07-10-task terra-implement gpt-5.6-terra
 ```
+
+```powershell
+scripts/delegate.ps1 [-f|--force|-Force] <task-slug> <role> <model> [input-file]
+# examples
+$Prompt | pwsh -NoProfile -File scripts/delegate.ps1 2026-07-10-task terra-implement gpt-5.6-terra
+pwsh -NoProfile -File scripts/delegate.ps1 2026-07-10-task terra-implement gpt-5.6-terra prompt.md
+```
+
+Contract tests for both helpers live in `scripts/test_delegate.sh` and `scripts/test_delegate.ps1`.
 
 Equivalent raw invocation when the helper is unavailable:
 
