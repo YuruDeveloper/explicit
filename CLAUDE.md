@@ -147,9 +147,9 @@ Equivalent raw invocation when the helper is unavailable:
 ```bash
 codex exec --sandbox workspace-write \
   -m gpt-5.6-terra \
-  --output-last-message agents/2026-07-10-task/terra-implement/result.md \
-  - < agents/2026-07-10-task/terra-implement/input.md \
-  > agents/2026-07-10-task/terra-implement/output.md
+  --output-last-message agents/2026-07-10-01-task/01-terra-implement/result.md \
+  - < agents/2026-07-10-01-task/01-terra-implement/input.md \
+  > agents/2026-07-10-01-task/01-terra-implement/output.md
 ```
 
 Run workers sandboxed (`--sandbox workspace-write`) rather than with `--dangerously-bypass-approvals-and-sandbox`; orchestrator approval gates commonly block the latter.
@@ -159,32 +159,34 @@ If the environment does not support `--output-last-message`, the wrapper must se
 **Commit ownership under sandboxing.** In a `git worktree`, the Git index lives under the parent repository's `.git` directory, so a sandboxed worker cannot run `git add`/`git commit` there. Therefore:
 
 - The worker changes files only; state "Do NOT git commit (the orchestrator commits)" in its `input.md`.
-- The orchestrator makes the commit, naming the actual working model and the `agents/<date>-<task>/<role>/` record path in the commit message so the audit trail is preserved.
+- The orchestrator makes the commit, naming the actual working model and the `agents/<date>-<NN>-<task>/<NN>-<role>/` record path in the commit message so the audit trail is preserved.
 
 ### 4.2 Required `agents/` Records
 
 Record every delegated task under the repository root using this structure:
 
 ```text
-agents/<YYYY-MM-DD>-<task-slug>/<agent-role>/
+agents/<YYYY-MM-DD>-<NN>-<task-slug>/<NN>-<agent-role>/
   input.md
   output.md
   result.md
 ```
 
+`<NN>` is a two-digit sequence number: per-date for task directories and per-task for role directories. `scripts/delegate.sh` and `scripts/delegate.ps1` allocate it automatically (max existing + 1) and reuse an existing directory when the same slug/role already exists for that date/task.
+
 Example:
 
 ```text
-agents/2026-07-10-stage0-sample/
-  terra-implement/input.md
-  terra-implement/output.md
-  terra-implement/result.md
-  luna-verify/input.md
-  luna-verify/output.md
-  luna-verify/result.md
-  sol-review/input.md
-  sol-review/output.md
-  sol-review/result.md
+agents/2026-07-10-01-stage0-sample/
+  01-terra-implement/input.md
+  01-terra-implement/output.md
+  01-terra-implement/result.md
+  02-luna-verify/input.md
+  02-luna-verify/output.md
+  02-luna-verify/result.md
+  03-sol-review/input.md
+  03-sol-review/output.md
+  03-sol-review/result.md
 ```
 
 - `input.md` contains the exact instructions sent to Codex.

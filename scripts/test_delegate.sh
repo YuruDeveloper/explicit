@@ -155,7 +155,7 @@ run_helper() {
 
 today=$(date +%F)
 role='luna-test'
-dir="$test_repo/agents/$today-delegate-contract/$role"
+dir="$test_repo/agents/$today-01-delegate-contract/01-$role"
 
 printf 'stdin prompt' | run_helper delegate-contract "$role" gpt-5.6-luna >"$tmpdir/run.out"
 [[ $(<"$dir/input.md") == 'stdin prompt' ]]
@@ -174,7 +174,7 @@ rg -F 'refusing to overwrite existing result.md' "$tmpdir/refuse.out" >/dev/null
 printf 'forced prompt' | run_helper --force delegate-contract "$role" gpt-5.6-luna >/dev/null
 [[ $(<"$dir/result.md") == 'forced prompt' ]]
 
-force_failure_dir="$test_repo/agents/$today-delegate-force-failure/luna-force-failure"
+force_failure_dir="$test_repo/agents/$today-02-delegate-force-failure/01-luna-force-failure"
 printf 'successful prompt' | run_helper delegate-force-failure luna-force-failure gpt-5.6-luna >/dev/null
 [[ $(<"$force_failure_dir/result.md") == 'successful prompt' ]]
 if printf 'failing forced prompt' | run_helper --force delegate-force-failure luna-force-failure exit-7 >/dev/null; then
@@ -189,7 +189,7 @@ fi
 
 printf 'file prompt' >"$tmpdir/prompt.md"
 run_helper delegate-file-input luna-file gpt-5.6-luna "$tmpdir/prompt.md" >/dev/null
-[[ $(<"$test_repo/agents/$today-delegate-file-input/luna-file/input.md") == 'file prompt' ]]
+[[ $(<"$test_repo/agents/$today-03-delegate-file-input/01-luna-file/input.md") == 'file prompt' ]]
 
 if printf 'failing prompt' | run_helper delegate-exit luna-exit exit-7 >/dev/null; then
   printf 'expected Codex exit status to be preserved\n' >&2
@@ -198,9 +198,9 @@ else
   status=$?
 fi
 [[ $status -eq 7 ]]
-[[ -f "$test_repo/agents/$today-delegate-exit/luna-exit/input.md" ]]
-[[ -f "$test_repo/agents/$today-delegate-exit/luna-exit/output.md" ]]
-[[ -f "$test_repo/agents/$today-delegate-exit/luna-exit/result.md" ]]
+[[ -f "$test_repo/agents/$today-04-delegate-exit/01-luna-exit/input.md" ]]
+[[ -f "$test_repo/agents/$today-04-delegate-exit/01-luna-exit/output.md" ]]
+[[ -f "$test_repo/agents/$today-04-delegate-exit/01-luna-exit/result.md" ]]
 
 hold_dir="$tmpdir/hold"
 mkdir "$hold_dir"
@@ -220,11 +220,13 @@ fi
 rg -F 'another invocation is already writing audit files' "$tmpdir/second.out" >/dev/null
 : >"$hold_dir/release"
 wait "$first_pid"
-concurrent_dir="$test_repo/agents/$today-delegate-concurrent/luna-concurrent"
+concurrent_dir="$test_repo/agents/$today-05-delegate-concurrent/01-luna-concurrent"
 [[ -f "$concurrent_dir/result.md" ]]
 
 stale_role='luna-stale-lock'
-stale_dir="$test_repo/agents/$today-delegate-stale-lock/$stale_role"
+# Pre-created with arbitrary numbers (07/05): the helper must reuse an existing
+# numbered dir whose slug/role matches instead of allocating a new number.
+stale_dir="$test_repo/agents/$today-07-delegate-stale-lock/05-$stale_role"
 stale_lock_path="$stale_dir/.lock"
 mkdir -p "$stale_dir"
 mkdir "$stale_lock_path"
@@ -237,7 +239,7 @@ printf 'stale lock prompt' | run_helper delegate-stale-lock "$stale_role" gpt-5.
 [[ ! -e $stale_lock_path ]]
 
 pending_role='luna-pending-codex-lock'
-pending_dir="$test_repo/agents/$today-delegate-pending-codex-lock/$pending_role"
+pending_dir="$test_repo/agents/$today-08-delegate-pending-codex-lock/01-$pending_role"
 pending_lock_path="$pending_dir/.lock"
 mkdir -p "$pending_lock_path"
 (exit 0) &
@@ -257,7 +259,7 @@ fi
 rg -F 'another invocation is already writing audit files' "$tmpdir/pending-codex.out" >/dev/null
 
 missing_pid_role='luna-missing-pid-lock'
-missing_pid_dir="$test_repo/agents/$today-delegate-missing-pid-lock/$missing_pid_role"
+missing_pid_dir="$test_repo/agents/$today-09-delegate-missing-pid-lock/01-$missing_pid_role"
 missing_pid_lock_path="$missing_pid_dir/.lock"
 mkdir -p "$missing_pid_lock_path"
 if printf 'must be refused' | run_helper delegate-missing-pid-lock "$missing_pid_role" gpt-5.6-luna >"$tmpdir/missing-pid.out" 2>&1; then
@@ -272,7 +274,7 @@ fi
 rg -F 'another invocation is already writing audit files' "$tmpdir/missing-pid.out" >/dev/null
 
 race_role='luna-stale-race'
-race_dir="$test_repo/agents/$today-delegate-stale-race/$race_role"
+race_dir="$test_repo/agents/$today-10-delegate-stale-race/01-$race_role"
 race_lock_path="$race_dir/.lock"
 race_control_dir="$tmpdir/stale-race"
 mkdir -p "$race_dir" "$race_control_dir"
@@ -321,7 +323,7 @@ if find "$race_dir" -maxdepth 1 -name '.lock.stale.*' -print -quit | rg . >/dev/
 fi
 
 orphan_role='luna-orphan-child'
-orphan_dir="$test_repo/agents/$today-delegate-orphan-child/$orphan_role"
+orphan_dir="$test_repo/agents/$today-11-delegate-orphan-child/01-$orphan_role"
 orphan_lock_path="$orphan_dir/.lock"
 orphan_hold_dir="$tmpdir/orphan-hold"
 mkdir "$orphan_hold_dir"
@@ -352,7 +354,7 @@ done
 rg -F 'another invocation is already writing audit files' "$tmpdir/orphan-second.out" >/dev/null
 
 wait_status_role='luna-wait-status'
-wait_status_dir="$test_repo/agents/$today-delegate-wait-status/$wait_status_role"
+wait_status_dir="$test_repo/agents/$today-12-delegate-wait-status/01-$wait_status_role"
 wait_status_hold_dir="$tmpdir/wait-status-hold"
 mkdir "$wait_status_hold_dir"
 printf 'wait status prompt' >"$tmpdir/wait-status.md"
@@ -374,7 +376,7 @@ set -e
 [[ ! -e $wait_status_dir/.lock ]]
 
 live_role='luna-live-lock'
-live_dir="$test_repo/agents/$today-delegate-live-lock/$live_role"
+live_dir="$test_repo/agents/$today-13-delegate-live-lock/01-$live_role"
 live_lock_path="$live_dir/.lock"
 mkdir -p "$live_dir"
 sleep 30 &

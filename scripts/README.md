@@ -18,11 +18,13 @@ scripts/delegate.sh stage0-sample terra-implement gpt-5.6-terra prompt.md
 결과는 저장소 루트의 다음 경로에 남습니다.
 
 ```text
-agents/<YYYY-MM-DD>-<task-slug>/<role>/
+agents/<YYYY-MM-DD>-<NN>-<task-slug>/<NN>-<role>/
   input.md
   output.md
   result.md
 ```
+
+`<NN>`은 두 자리 순번입니다. task 디렉터리는 날짜 기준, role 디렉터리는 task 기준으로 스크립트가 자동 할당(기존 최대 번호 +1)하며, 같은 slug/role의 디렉터리가 이미 있으면 번호와 무관하게 재사용합니다.
 
 기존 `result.md`가 있으면 안전을 위해 실행하지 않습니다. 의도적으로 다시 실행하려면 `-f` 또는 `--force`를 함께 전달합니다. 강제 실행은 Codex를 시작하기 전에 이전 `result.md`를 비웁니다.
 

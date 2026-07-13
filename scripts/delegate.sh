@@ -70,7 +70,39 @@ if ! repo_root=$(git rev-parse --show-toplevel 2>/dev/null); then
   exit 1
 fi
 
-agent_dir="$repo_root/agents/$(date +%F)-$task_slug/$role"
+# Directory layout: agents/<YYYY-MM-DD>-<NN>-<task-slug>/<NN>-<role>/
+# NN is auto-allocated (per-date for tasks, per-task for roles); an existing
+# directory with the same slug/role is reused so reruns and --force keep working.
+resolve_numbered_dir() {
+  local parent=$1 prefix=$2 slug=$3
+  local max=0 found='' path name num rest
+
+  if [[ -d $parent ]]; then
+    for path in "$parent"/"$prefix"*; do
+      [[ -d $path ]] || continue
+      name=${path##*/}
+      name=${name#"$prefix"}
+      if [[ $name =~ ^([0-9]+)-(.+)$ ]]; then
+        num=$((10#${BASH_REMATCH[1]}))
+        rest=${BASH_REMATCH[2]}
+        (( num > max )) && max=$num
+        [[ $rest == "$slug" ]] && found=${path##*/}
+      fi
+    done
+  fi
+
+  if [[ -n $found ]]; then
+    printf '%s\n' "$found"
+  else
+    printf '%s%02d-%s\n' "$prefix" $((max + 1)) "$slug"
+  fi
+}
+
+agents_root="$repo_root/agents"
+date_str=$(date +%F)
+task_dir_name=$(resolve_numbered_dir "$agents_root" "$date_str-" "$task_slug")
+role_dir_name=$(resolve_numbered_dir "$agents_root/$task_dir_name" '' "$role")
+agent_dir="$agents_root/$task_dir_name/$role_dir_name"
 input_path="$agent_dir/input.md"
 output_path="$agent_dir/output.md"
 result_path="$agent_dir/result.md"

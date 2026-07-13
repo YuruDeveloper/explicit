@@ -76,7 +76,30 @@ if ($LASTEXITCODE -ne 0 -or -not $RepoRoot) {
 }
 $RepoRoot = $RepoRoot.Trim()
 
-$AgentDir = Join-Path $RepoRoot ("agents/{0}-{1}/{2}" -f (Get-Date -Format 'yyyy-MM-dd'), $TaskSlug, $Role)
+# Directory layout: agents/<YYYY-MM-DD>-<NN>-<task-slug>/<NN>-<role>/
+# NN is auto-allocated (per-date for tasks, per-task for roles); an existing
+# directory with the same slug/role is reused so reruns and --force keep working.
+function Resolve-NumberedDir([string]$Parent, [string]$Prefix, [string]$Slug) {
+    $Max = 0
+    $Found = $null
+    if (Test-Path -LiteralPath $Parent) {
+        foreach ($Dir in (Get-ChildItem -LiteralPath $Parent -Directory)) {
+            if ($Dir.Name -cmatch ('^' + [regex]::Escape($Prefix) + '([0-9]+)-(.+)$')) {
+                $Num = [int]$Matches[1]
+                if ($Num -gt $Max) { $Max = $Num }
+                if ($Matches[2] -ceq $Slug) { $Found = $Dir.Name }
+            }
+        }
+    }
+    if ($Found) { return $Found }
+    return ('{0}{1:d2}-{2}' -f $Prefix, ($Max + 1), $Slug)
+}
+
+$AgentsRoot = Join-Path $RepoRoot 'agents'
+$DateStr = Get-Date -Format 'yyyy-MM-dd'
+$TaskDirName = Resolve-NumberedDir $AgentsRoot "$DateStr-" $TaskSlug
+$RoleDirName = Resolve-NumberedDir (Join-Path $AgentsRoot $TaskDirName) '' $Role
+$AgentDir = Join-Path $AgentsRoot (Join-Path $TaskDirName $RoleDirName)
 $InputPath = Join-Path $AgentDir 'input.md'
 $OutputPath = Join-Path $AgentDir 'output.md'
 $ResultPath = Join-Path $AgentDir 'result.md'

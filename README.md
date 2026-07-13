@@ -33,7 +33,7 @@ Lead orchestrator (fable-5)
     │      └─ codex exec -m <actual GPT model>
     │
     ├─ 4. Record the delegation explicitly
-    │      agents/<date>-<task>/<role>/
+    │      agents/<date>-<NN>-<task>/<NN>-<role>/
     │        ├─ input.md   ─ Exact instructions sent to Codex
     │        ├─ output.md  ─ Complete action, tool, and execution log
     │        └─ result.md  ─ Final result read by the parent agent
@@ -121,7 +121,7 @@ This makes the actual working model visible in both the user interface and the a
 Every delegated task produces three files.
 
 ```text
-agents/2026-07-10-example/terra-implement/
+agents/2026-07-10-01-example/01-terra-implement/
   input.md
   output.md
   result.md

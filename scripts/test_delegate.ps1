@@ -98,7 +98,7 @@ Set-Content -LiteralPath $resultPath -Value $stdin -NoNewline
     $Today = Get-Date -Format 'yyyy-MM-dd'
 
     # --- 1. basic stdin run ---------------------------------------------------
-    $Dir = Join-Path $TestRepo "agents/$Today-delegate-contract/luna-test"
+    $Dir = Join-Path $TestRepo "agents/$Today-01-delegate-contract/01-luna-test"
     $RunOut = Run-Helper @('delegate-contract', 'luna-test', 'gpt-5.6-luna') 'stdin prompt'
     Assert ($script:LastExit -eq 0) "basic run exit code: $script:LastExit"
     Assert ((Get-Content "$Dir/input.md" -Raw).Trim() -eq 'stdin prompt') 'input.md content'
@@ -119,7 +119,7 @@ Set-Content -LiteralPath $resultPath -Value $stdin -NoNewline
     Assert ((Get-Content "$Dir/result.md" -Raw).Trim() -eq 'forced prompt') 'forced result.md content'
 
     # --- 4. forced failing run truncates result.md and keeps exit code ---------
-    $FfDir = Join-Path $TestRepo "agents/$Today-delegate-force-failure/luna-force-failure"
+    $FfDir = Join-Path $TestRepo "agents/$Today-02-delegate-force-failure/01-luna-force-failure"
     Run-Helper @('delegate-force-failure', 'luna-force-failure', 'gpt-5.6-luna') 'successful prompt' | Out-Null
     Assert ((Get-Content "$FfDir/result.md" -Raw).Trim() -eq 'successful prompt') 'pre-failure result.md'
     Run-Helper @('--force', 'delegate-force-failure', 'luna-force-failure', 'exit-7') 'failing forced prompt' | Out-Null
@@ -131,13 +131,13 @@ Set-Content -LiteralPath $resultPath -Value $stdin -NoNewline
     Set-Content "$TmpDir/prompt.md" 'file prompt' -NoNewline
     Run-Helper @('delegate-file-input', 'luna-file', 'gpt-5.6-luna', "$TmpDir/prompt.md") | Out-Null
     Assert ($script:LastExit -eq 0) 'file input exit code'
-    $FileInputPath = Join-Path $TestRepo "agents/$Today-delegate-file-input/luna-file/input.md"
+    $FileInputPath = Join-Path $TestRepo "agents/$Today-03-delegate-file-input/01-luna-file/input.md"
     Assert ((Get-Content $FileInputPath -Raw).Trim() -eq 'file prompt') 'file input.md content'
 
     # --- 6. codex exit status preserved, all three files exist -------------------
     Run-Helper @('delegate-exit', 'luna-exit', 'exit-7') 'failing prompt' | Out-Null
     Assert ($script:LastExit -eq 7) "exit-7 preserved: $script:LastExit"
-    $ExitDir = Join-Path $TestRepo "agents/$Today-delegate-exit/luna-exit"
+    $ExitDir = Join-Path $TestRepo "agents/$Today-04-delegate-exit/01-luna-exit"
     foreach ($f in 'input.md', 'output.md', 'result.md') {
         Assert (Test-Path "$ExitDir/$f") "exit-7 run created $f"
     }
@@ -155,11 +155,13 @@ Set-Content -LiteralPath $resultPath -Value $stdin -NoNewline
     Set-Content "$HoldDir/release" ''
     $First.WaitForExit()
     Assert ($First.ExitCode -eq 0) "held run exit code: $($First.ExitCode)"
-    Assert (Test-Path (Join-Path $TestRepo "agents/$Today-delegate-concurrent/luna-concurrent/result.md")) 'held run result.md exists'
+    Assert (Test-Path (Join-Path $TestRepo "agents/$Today-05-delegate-concurrent/01-luna-concurrent/result.md")) 'held run result.md exists'
 
     # --- 8. stale lock (dead owner) is taken over --------------------------------
+    # Pre-created with arbitrary numbers (07/05): the helper must reuse an
+    # existing numbered dir whose slug/role matches instead of allocating anew.
     $DeadPid = Get-DeadPid
-    $StaleDir = Join-Path $TestRepo "agents/$Today-delegate-stale-lock/luna-stale-lock"
+    $StaleDir = Join-Path $TestRepo "agents/$Today-07-delegate-stale-lock/05-luna-stale-lock"
     New-Item -ItemType Directory -Force "$StaleDir/.lock" | Out-Null
     Set-Content "$StaleDir/.lock/pid" $DeadPid
     Run-Helper @('delegate-stale-lock', 'luna-stale-lock', 'gpt-5.6-luna') 'stale lock prompt' | Out-Null
@@ -168,7 +170,7 @@ Set-Content -LiteralPath $resultPath -Value $stdin -NoNewline
     Assert (-not (Test-Path "$StaleDir/.lock")) 'stale lock cleaned up'
 
     # --- 9. dead owner with pending codex marker is refused ----------------------
-    $PendingDir = Join-Path $TestRepo "agents/$Today-delegate-pending/luna-pending"
+    $PendingDir = Join-Path $TestRepo "agents/$Today-08-delegate-pending/01-luna-pending"
     New-Item -ItemType Directory -Force "$PendingDir/.lock" | Out-Null
     Set-Content "$PendingDir/.lock/pid" $DeadPid
     Set-Content "$PendingDir/.lock/codex_pid" 'pending'
@@ -179,7 +181,7 @@ Set-Content -LiteralPath $resultPath -Value $stdin -NoNewline
     Assert ($PendingOut.Contains('another invocation is already writing audit files')) 'pending refusal message'
 
     # --- 10. lock with no pid file is refused ------------------------------------
-    $NoPidDir = Join-Path $TestRepo "agents/$Today-delegate-missing-pid/luna-missing-pid"
+    $NoPidDir = Join-Path $TestRepo "agents/$Today-09-delegate-missing-pid/01-luna-missing-pid"
     New-Item -ItemType Directory -Force "$NoPidDir/.lock" | Out-Null
     $NoPidOut = Run-Helper @('delegate-missing-pid', 'luna-missing-pid', 'gpt-5.6-luna') 'must be refused'
     Assert ($script:LastExit -eq 1) "missing-pid refusal exit code: $script:LastExit"
@@ -187,7 +189,7 @@ Set-Content -LiteralPath $resultPath -Value $stdin -NoNewline
     Assert ($NoPidOut.Contains('another invocation is already writing audit files')) 'missing-pid refusal message'
 
     # --- 11. live-owner lock is refused -------------------------------------------
-    $LiveDir = Join-Path $TestRepo "agents/$Today-delegate-live-lock/luna-live-lock"
+    $LiveDir = Join-Path $TestRepo "agents/$Today-10-delegate-live-lock/01-luna-live-lock"
     New-Item -ItemType Directory -Force "$LiveDir/.lock" | Out-Null
     Set-Content "$LiveDir/.lock/pid" $PID
     $LiveOut = Run-Helper @('delegate-live-lock', 'luna-live-lock', 'gpt-5.6-luna') 'must be refused'
@@ -199,7 +201,7 @@ Set-Content -LiteralPath $resultPath -Value $stdin -NoNewline
     $OrphanHold = Join-Path $TmpDir 'orphan-hold'
     New-Item -ItemType Directory $OrphanHold | Out-Null
     $env:DELEGATE_TEST_HOLD_DIR = $OrphanHold
-    $OrphanLock = Join-Path $TestRepo "agents/$Today-delegate-orphan/luna-orphan/.lock"
+    $OrphanLock = Join-Path $TestRepo "agents/$Today-11-delegate-orphan/01-luna-orphan/.lock"
     Set-Content "$TmpDir/orphan-prompt.md" 'orphan prompt' -NoNewline
     $OrphanJob = Start-HelperBackground @('--force', 'delegate-orphan', 'luna-orphan', 'orphan-hold', "$TmpDir/orphan-prompt.md") "$TmpDir/orphan.out"
     Wait-ForFile "$OrphanHold/started"
@@ -222,7 +224,7 @@ Set-Content -LiteralPath $resultPath -Value $stdin -NoNewline
     $WaitHold = Join-Path $TmpDir 'wait-hold'
     New-Item -ItemType Directory $WaitHold | Out-Null
     $env:DELEGATE_TEST_HOLD_DIR = $WaitHold
-    $WaitLock = Join-Path $TestRepo "agents/$Today-delegate-wait-status/luna-wait/.lock"
+    $WaitLock = Join-Path $TestRepo "agents/$Today-12-delegate-wait-status/01-luna-wait/.lock"
     Set-Content "$TmpDir/wait-prompt.md" 'wait status prompt' -NoNewline
     $WaitJob = Start-HelperBackground @('delegate-wait-status', 'luna-wait', 'hold-exit-7', "$TmpDir/wait-prompt.md") "$TmpDir/wait.out"
     Wait-ForFile "$WaitHold/started"
