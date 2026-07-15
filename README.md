@@ -29,13 +29,10 @@ Lead orchestrator (fable-5)
     │      High-risk work and review  → gpt-5.6-sol
     │      Bulk and mechanical work   → gpt-5.6-terra
     │      Routine verification       → gpt-5.6-luna
-    │      Single-shot UI / low-cost
-    │      auxiliary parallel work    → grok-4.5
     │
     ├─ 3. Invoke a sonnet-5 thin wrapper
     │      └─ scripts/delegate.sh (bash) or scripts/delegate.ps1 (PowerShell)
     │         └─ codex exec -m <actual GPT model>
-    │         (grok-4.5 uses the grok CLI instead; see CLAUDE.md 4.5)
     │
     ├─ 4. Record the delegation explicitly
     │      agents/<date>-<NN>-<task>/<NN>-<role>/
@@ -99,7 +96,6 @@ Using the most expensive model for every task wastes resources. Assigning diffic
 | Adversarial review and advanced refactoring | gpt-5.6-sol | Independent verification and high code quality |
 | Bulk implementation, analysis, and migrations | gpt-5.6-terra | Strong execution ability and cost efficiency |
 | Routine builds, tests, and static checks | gpt-5.6-luna | Lowest cost for narrow, deterministic work |
-| Self-contained single-shot UI and auxiliary parallel work | grok-4.5 | Zero marginal cost within its subscription cap; no audit trail, so not for audited work |
 | Lightweight relay for invoking GPT models | sonnet-5 | Handles invocation and records without doing the substantive work |
 
 The governing priority is:
@@ -128,8 +124,6 @@ input.md + output.md + result.md
 The wrapper does not perform the substantive task. It records the instructions, invokes the selected GPT model, and preserves the resulting files.
 
 The standard invocation path is `scripts/delegate.sh` (bash) or `scripts/delegate.ps1` (Windows PowerShell). Both record `input.md`, invoke `codex exec -m <model> --output-last-message`, preserve `output.md`/`result.md` and the Codex exit code, and guard the audit directory with an atomic per-target lock (stale-owner recovery, orphaned-Codex detection, no double writers). Contract tests live in `scripts/test_delegate.sh` and `scripts/test_delegate.ps1`.
-
-grok-4.5 is the exception: it is invoked through the `grok` CLI, cannot produce a verbatim action log, and is therefore not used for work requiring audit evidence (see CLAUDE.md 4.5).
 
 This makes the actual working model visible in both the user interface and the audit trail.
 
